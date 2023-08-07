@@ -1,0 +1,13 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# python
+.ipynb_checkpoints
+
+# general
+.idea
+.vscode
