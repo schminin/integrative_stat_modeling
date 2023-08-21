@@ -1,7 +1,7 @@
 using CSV
 using DataFrames
-
-
+using RCall
+using Dates
 
 ##############################################################
 # Load data
@@ -16,9 +16,9 @@ function load_data(country::String, rolling_avg::Bool)
     
     # select relevant columns
     if rolling_avg
-        return df[!,[:date, :conc_7d_ravg, :incidence_7d, :city]]
+        return df[!,[:date, :viral_load, :cases_7d, :city]]
     else
-        return df[!,[:date, :viral_load, :cases_reported_date, :city]]
+        return df[!,[:date, :conc_7d_ravg, :cases_7d, :city]]
     end
 end
 
@@ -38,18 +38,75 @@ end
 ##############################################################
 # Transmission Process
 ##############################################################
+"""
+estimate discrete serial interval weights ω
+(see https://github.com/lin-lab/MERMAID/blob/befea7bac282e030f3811a022216cb3e2610e7d5/US_analysis_scripts/fit_state.R#L40
+and https://github.com/mrc-ide/EpiEstim/blob/a0d025b518db8dc9e2ab3da887e54393f7ddf533/R/discr_si.R#L9 )
+"""
+function discr_si(k=1:30, mu::Float64 = 4.7, sigma::Float64 = 2.9)
+    R"""
+    vnapply <- function(X, FUN, ...) {
+        vapply(X, FUN, numeric(1), ...)
+    }
+
+    discr_si <- function(k, mu, sigma) {
+        if (sigma < 0) {
+            stop("sigma must be >=0.")
+        }
+        if (mu <= 1) {
+            stop("mu must be >1")
+        }
+        if (any(k < 0)) {
+            stop("all values in k must be >=0.")
+        }
+        
+        a <- ((mu - 1) / sigma)^2
+        b <- sigma^2 / (mu - 1)
+        
+        cdf_gamma <- function(k, a, b) stats::pgamma(k, shape = a, scale = b)
+        
+        res <- k * cdf_gamma(k, a, b) + 
+            (k - 2) * cdf_gamma(k - 2, a, b) - 2 * (k - 1) * cdf_gamma(k - 1, a, b)
+        res <- res + a * b * (2 * cdf_gamma(k - 1, a + 1, b) - 
+                                cdf_gamma(k - 2, a + 1, b) - cdf_gamma(k, a + 1, b))
+        res <- vnapply(res, function(e) max(0, e))
+        
+        return(res)
+    }
+    """
+
+    return rcopy(R"discr_si($k, mu = $mu, sigma = $sigma)")
+end
+
+
 
 """
 defines the infection potential used to sample new infections on day t
 """
-function infection_potential(t::Int, Y::Vector{T} where T<:Real, ω::Vector{T} where T<:Real, m_a::Int=30)
-    if t<=m_a
-        Λ_it = ω[end-t:end]*Y[end-t:end] + (1-sum(ω[end-t:end]))*Y_avg
+function infection_potential(t::Int, Y::Vector{T} where T<:Real, ω::Vector{T} where T<:Real, m_Λ::Int=30, Y_avg::Float64=50.0)
+    if t<=m_Λ # warmup phase
+        Λ_it = sum(ω[1:t].*Y[1:t]) + (1-sum(ω[1:t]))*Y_avg
     else
-        Λ_it = ω*Y[end-m_a:end] 
+        Λ_it = sum(ω.*Y) + (1-sum(ω))*Y_avg
     end
     return Λ_it
 end
+
+"""
+Calculate the number of infections i=0:m_A days ago that 
+were reported on the current state day, i.e. A_i,t-k,k
+"""
+function get_n_infected_i_days_ago(state, ϕ, m_A)
+    Y_it = state[1:m_A]
+    I_from_0 = Binomial(Y_it[1], ϕ[1]) # equivalent to A_{i,t,0}  
+    # people infected two days ago and reported one day ago
+    I_from_1_rep_0 = Binomial(Y_it[2], ϕ[1]) # equivalent to A_{i,t-1,0}  
+    I_from_1 = Binomial(Y_it[2]-I_from_1_rep_0, ϕ[2]/(1-ϕ[1])) # equivalent to A_{i,t-1,1}  
+    # rest
+    I_from_rest = [Binomial(Y_it[3+k]-state[m_A+1+k], phi[3+k]/(1-sum(phi[1:2+k]))) for k in 0:m_A-3] # equivalent to A_{i,t-k,k}  
+    return vcat(I_from_0, I_from_1, I_from_rest)
+end
+
 
 # option 1: constant reproduction number
 #function estimate_reproduction_number()
@@ -57,7 +114,7 @@ end
 #end
 
 # option 2:
-function brownian_reproduction_number(variance::Float)
-    # todo
+function brownian_reproduction_number(R0::Float64, variance::Float64)
+    return R0 + rand(Normal(0, variance))
 end
 
