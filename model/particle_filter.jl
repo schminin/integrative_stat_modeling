@@ -1,6 +1,7 @@
 include("utils.jl")
 using Distributions
 using LowLevelParticleFilters
+using Random
 
 ##############################################################
 # Settings
@@ -9,7 +10,6 @@ using LowLevelParticleFilters
 # general
 min_date = Date(2022,1,1)
 country = "canada"
-rolling_avg = true
 
 # transmission process
 R0 = 1.0
@@ -17,9 +17,10 @@ m_A = 21
 ω =  discr_si(1:m_A, 4.7, 2.9) # prob. that time until onset of secondary cases is i days
 
 # particle filter
-n = 2*m_A + 1   # dimension of state 
-                # contains Y_i_t-k for k=0,...,m_A (m_A+1)and
-                # sum_j A_i,t-k,j (m_A-1) 
+n = 3*m_A + 3   # dimension of state 
+                # contains Y_i_t-k for k=0,...,m_A -> (m_A+1)and
+                # A_i, t-k, k for k = 0, ...,m_A -> (m_A+1)
+                # sum_j A_i,t-k,j -> (m_A) 
                 # one state for R0
                 # later, we will add m_A days for the concentration?
 m = 0       # dimension of input
@@ -36,8 +37,8 @@ df = create_time_idx(df, min_date)
 
 
 p = (Y_avg = 50.0, # number of imported infections 
-    ϕ = repeat([0.047], 21), # parameters of multinomial
-    σ_2 = 1.0, # Variance of NB noise distribution
+    ϕ = repeat([1/(m_A+1)], m_A+1), # parameters of multinomial
+    dispersion = 1.0, # Variance mean ratio of NB noise distribution 
     R0_σ_2 = 0.01,
     )
 
@@ -55,19 +56,31 @@ w:  disturbances (noise)
 """
 function dynamics(x, u, p, t, noise=false)
     Λ_it = infection_potential(t, x[2:m_A+1], ω, m_A, p.Y_avg)
-    R0 = brownian_reproduction_number(x[end], p.R0_σ_2)
-        
-    # A_i, t-j, j
-    Aijj = get_n_infected_i_days_ago(x, ϕ, m_A)
-
-    # update step
-    # Yit 
-    x[2:m_A] = x[1:m_A-1]
+    
+    # Update Yit -> Yi,t+1        
+    # Yit = x[1:m_A+1]
+    x[2:m_A+1] = x[1:m_A]
     if noise
-        x[1] = rand(Distributions.Poisson(Λ_it*R0), 1)
+        x[1] = rand(Distributions.Poisson(Λ_it*x[end]), 1)
     end
-    # aggregate A_i for next time step
-    x[m_A+1, end-1] = Aijj[3, end-1] + x[m_A+1, end-1] # A_i,t-j,0 + A_i,t-j,1 + ...+A_i,t-j,j
+
+    # Define helper
+    # Ai,t-j,j = x[m_A+2, 2*m_A+3]
+    Aijj = x[m_A+2, 2*m_A+3] # m_A+1 elements
+    sum_Aik = x[2*m_A+4, 3*m_A+3] # m_A-1 elements
+    helper = vcat([0.], sum_Aik) + Aijj[1:end-1]
+
+    # Update sum_Aik(t) -> sum_Aik(t+1)
+    x[2*m_A+4, 3*m_A+3] = helper[1:end-1]
+
+    # Update Aijj(t) -> Aijj(t+1)
+    bin_p = p.ϕ ./ (1 .- vcat([0.], cumsum(p.ϕ))[1:end-1])
+    μ = x[1:m_A+1] - vcat(0, helper)
+    x[m_A+2, 2*m_A+3] = [Binomial(μ[i], bin_p[i]) for i in eachindex(μ)]
+
+    # Update R0
+    x[end] = brownian_reproduction_number(x[end], p.R0_σ_2)
+
     return x
 end
 
@@ -82,12 +95,12 @@ p:  parameter
 t: time
 """
 function measurement_likelihood(x, u, y, p, t)
-    Aijj = get_n_infected_i_days_ago(x, ϕ, m_A)
+    Aijj = x[m_A+2, 2*m_A+3] # see above
     Mit = sum(Aijj)
     # log-likelhiood of measurement given the state
-    p_s = Mit / p.σ_2 # success probability p = mu/σ²
+    p_s = 1/p.dispersion  # success probability p = mu/σ²
     r = Mit * p_s / (1-p_s) # number of successes
-    return logpdf(NegativeBinomial(r, p_s), y)
+    return logpdf(NegativeBinomial(r, p_s), y) # todo possibly add likelihood with prior on reproduction number
 end
 
 """
@@ -101,10 +114,10 @@ e:  disturbances (noise)
 """
 function measurement(x, u, p, t, noise=false)
     # Number of Reported Infected Individuals
-    Aijj = get_n_infected_i_days_ago(x, p.ϕ, m_A)
+    Aijj = x[m_A+2, 2*m_A+3] # see above
     Mit = sum(Aijj)
     if noise
-        p_s = Mit / p.σ_2 # success probability p = mu/σ²
+        p_s = 1/p.dispersion  # success probability p = mu/σ²
         r = Mit * p_s / (1-p_s) # number of successes
         Oit = rand(NegativeBinomial(r, p_s), 1)
     end
@@ -115,14 +128,46 @@ function measurement(x, u, p, t, noise=false)
     return Oit
 end
 
-# initial state distribution
-# todo: define custom multivariate distribution
-d0 = MvNormal(randn(n),2.0)
-df = Normal(0.0,0.0)
+struct InitialDistribution 
+    n::Int
+end
+
+function Random.rand(rng::AbstractRNG=Random.default_rng(), d::InitialDistribution=InitialDistribution(n))
+    multi = Multinomial(5, repeat([1/(m_A+1)], m_A+1))
+    I_t = rand(rng, multi)
+    Aijj = repeat([0.], m_A+1)
+    sum_A = repeat([0.], m_A-1)
+    R0 = rand(rng,Weibull(1,2))
+    return vcat(I_t, Aijj, sum_A, R0)
+end
+
+function Base.length(d::InitialDistribution)
+    return d.n
+end
+
+d = InitialDistribution(n)
+res = rand(Random.default_rng(), d)
+
+d0 = InitialDistribution(n)
+df = Normal(0.0,0.0) # Dynamics noise Distribution
+
+"=
+# todo
+struct InitialDistribution end
+
+struct MyState state_integer::Vector{Int}; state_real::Vector{Float64} end
+
+function Random.rand(rng, d::InitialDistribution)
+    Return MyState(rand(rng, MultinNomiall(...)), rand(rng, Normal(…))
+end
+
+# alternatively
+Struct MyState <: AbstractVector{Float64} … end
+="
 
 pf = AdvancedParticleFilter(N, dynamics, measurement, measurement_likelihood, df, d0)
 
-du = MvNormal(0, 1.0)
+du = MvNormal(m, 1.0) # Random input distribution for simulation
 xs,u,y = simulate(pf,200,du, p) # We can simulate the model that the pf represents
 pf(u[1], y[1])               # Perform one filtering step using input u and measurement y
 particles(pf)                # Query the filter for particles, try weights(pf) or expweights(pf) as well

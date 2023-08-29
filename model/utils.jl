@@ -92,21 +92,6 @@ function infection_potential(t::Int, Y::Vector{T} where T<:Real, ω::Vector{T} w
     return Λ_it
 end
 
-"""
-Calculate the number of infections i=0:m_A days ago that 
-were reported on the current state day, i.e. A_i,t-k,k
-"""
-function get_n_infected_i_days_ago(state, ϕ, m_A)
-    Y_it = state[1:m_A]
-    I_from_0 = Binomial(Y_it[1], ϕ[1]) # equivalent to A_{i,t,0}  
-    # people infected two days ago and reported one day ago
-    I_from_1_rep_0 = Binomial(Y_it[2], ϕ[1]) # equivalent to A_{i,t-1,0}  
-    I_from_1 = Binomial(Y_it[2]-I_from_1_rep_0, ϕ[2]/(1-ϕ[1])) # equivalent to A_{i,t-1,1}  
-    # rest
-    I_from_rest = [Binomial(Y_it[3+k]-state[m_A+1+k], phi[3+k]/(1-sum(phi[1:2+k]))) for k in 0:m_A-3] # equivalent to A_{i,t-k,k}  
-    return vcat(I_from_0, I_from_1, I_from_rest)
-end
-
 
 # option 1: constant reproduction number
 #function estimate_reproduction_number()
@@ -115,6 +100,6 @@ end
 
 # option 2:
 function brownian_reproduction_number(R0::Float64, variance::Float64)
-    return R0 + rand(Normal(0, variance))
+    return max(0, R0 + rand(Normal(0, variance)))
 end
 
