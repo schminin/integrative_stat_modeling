@@ -25,7 +25,7 @@ const m_A = 21
 n = 3*m_A + 3   # dimension of state 
                 # contains Y_i_t-k for k=0,...,m_A -> (m_A+1)and
                 # A_i, t-k, k for k = 0, ...,m_A -> (m_A+1)
-                # sum_j A_i,t-k,j -> (m_A-1) 
+                # sum_j A_i,t-k,j -> (m_A) 
                 # one state for R0
                 # later, we will add m_A days for the concentration?
 m = 0       # dimension of input
