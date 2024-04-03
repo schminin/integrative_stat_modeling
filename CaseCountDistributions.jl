@@ -141,29 +141,62 @@ end
 Random.rand(d::CaseCountDistribution) = rand(Random.default_rng(), d)
 
 
-
-
 ######################################################################
 # Testing Area 
 ######################################################################
 
-cc = CaseCountDistribution(reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0)), SVector(2.0, 2.0))
-cc.m_Λ
+function test_distribution_update()
+    cc = CaseCountDistribution(reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0)), SVector(2.0, 2.0))
 
-old_state = reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0))
-old_Y = old_state[1:cc.m_Λ+1]
-old_A = old_state[cc.m_Λ+2:2*(cc.m_Λ+1)]
-old_A_sum = old_state[2*cc.m_Λ+3:3*cc.m_Λ+1]
-old_R = old_state[end]
+    old_state = reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0))
+    old_Y = old_state[1:cc.m_Λ+1]
+    old_A = old_state[cc.m_Λ+2:2*(cc.m_Λ+1)]
+    old_A_sum = old_state[2*cc.m_Λ+3:3*cc.m_Λ+1]
+    old_R = old_state[end]
 
-rand(cc)
+    new_state = rand(cc)
+    new_Y = new_state[1:cc.m_Λ+1]
+    new_A = new_state[cc.m_Λ+2:2*(cc.m_Λ+1)]
+    new_A_sum = new_state[2*cc.m_Λ+3:3*cc.m_Λ+1]
+    new_R = new_state[end]
+
+    # test 1: Update Y is likely correct
+    if ! (new_Y[2:end] == old_Y[1:end-1])
+        print("Error in Y update: Values are not shifted correctly")
+    end
+    if ! (isinteger(new_Y[1]))
+        print("Error in Y update: Y[1] is not an integer")
+    end
+    if (new_Y[2:end] == old_Y[1:end-1]) & isinteger(new_Y[1])
+        print("Update of Y is correct")
+    end
+
+    # test 2: Update A is likely correct
+    # subtest a): A[1] is smaller than Y[1]
+    if ! (new_A[1] <= new_Y[1])
+        print("Error in A update: A[1] is larger than Y[1]")
+    end
+    # subtest b): sum of old and new A of one timepoint of infection are smaller than corresponding Y
+    if !all(new_A[2:end] + old_A[1:end-1] .<= old_Y[1:end-1])
+        print("Error in A update: sum of two A's is larger than corresponding Y")
+    end
+    
+    # test 3: Update of A_sum is likely correct
+    if !(new_A_sum[1] == old_A[1] + new_A[2])
+        print("Error in A_sum update: A_sum[1] is not correct")
+    end
+end
+
+test_distribution_update()
+
+
 
 ytest = SVector(1.0, 2.0, 3.0)
 
 old_test = ytest[SVector(Array(range(1,3))...)]
 
 new_test = similar(old_test)
- 
+
 om, pi = CaseCountParameterMapping(SVector(2.0, 2.0), 8)
 om
 
