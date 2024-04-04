@@ -121,9 +121,11 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_Y[1], new_A[1] = rand(rng, MixedPoiBin(Λ, old_R, bin_par[1])) #TODO Parameter ordering
 
     # update A_{t-j, j} by binomial
-    new_A[2] = rand(rng, Binomial(old_Y[1]-old_A[1], bin_par[2]) )
+    new_A[2] = rand(rng, Binomial(old_Y[1]-old_A[1], bin_par[2]) ) # n of Binomial is: Y_{t-1}-A_{t-1,0}
     for k in 3:d.m_Λ+1
-        new_A[k]= rand(rng, Binomial(old_Y[k]-old_A_sum[k-2], bin_par[k])) #TODO Parameter ordering
+        # e.g. for k=3 -> A_{t-2,2}
+        #         -> n of Binomial is: Y_{t-2}-old_sum_A_{t-2} 
+        new_A[k]= rand(rng, Binomial(new_Y[k]-old_A_sum[k-2], bin_par[k])) #TODO Parameter ordering
     end
 
     # update A_sums by shifting and summation
@@ -145,10 +147,36 @@ Random.rand(d::CaseCountDistribution) = rand(Random.default_rng(), d)
 # Testing Area 
 ######################################################################
 
-function test_distribution_update()
-    cc = CaseCountDistribution(reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0)), SVector(2.0, 2.0))
+# test function for initial states
+function check_initial_state(state, m_Λ)
+    Y = state[1:m_Λ+1]
+    A = state[m_Λ+2:2*(m_Λ+1)]
+    A_sum = state[2*m_Λ+3:3*m_Λ+1]
+    R = state[end]
+    if any(A.>Y)
+        println("A cannot be larger than Y")
+        println("Error at: $(.!(A.<=Y))")
+    end
+    if any(A_sum.>Y)
+        println("A_sum cannot be larger than Y")
+        println("Error at: $(.!(A_sum.<=Y))")
+    end
+    if any(A[2:end-1].>A_sum)
+        println("A_{t-i, i} cannot be larger than A_sum_{t}")
+        println("Error at: $(.!(A[2:end-1].<=A_sum))")
+    end
+    if R < 0
+        println("R cannot be negative")
+    end
+end
 
-    old_state = reverse(SVector(1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0))
+check_initial_state(SVector(8.0, 7.0, 6.0, 5.0, 2.0, 3.0, 4.0, 1), 2)
+
+
+function test_distribution_update()
+    old_state = SVector(8.0, 7.0, 6.0, 5.0, 2.0, 3.0, 4.0, 1)
+    cc = CaseCountDistribution(old_state, SVector(2.0, 2.0))
+    
     old_Y = old_state[1:cc.m_Λ+1]
     old_A = old_state[cc.m_Λ+2:2*(cc.m_Λ+1)]
     old_A_sum = old_state[2*cc.m_Λ+3:3*cc.m_Λ+1]
@@ -162,13 +190,13 @@ function test_distribution_update()
 
     # test 1: Update Y is likely correct
     if ! (new_Y[2:end] == old_Y[1:end-1])
-        print("Error in Y update: Values are not shifted correctly")
+        println("Error in Y update: Values are not shifted correctly")
     end
     if ! (isinteger(new_Y[1]))
-        print("Error in Y update: Y[1] is not an integer")
+        println("Error in Y update: Y[1] is not an integer")
     end
     if (new_Y[2:end] == old_Y[1:end-1]) & isinteger(new_Y[1])
-        print("Update of Y is correct")
+        println("Update of Y is correct \n")
     end
 
     # test 2: Update A is likely correct
@@ -177,18 +205,22 @@ function test_distribution_update()
         print("Error in A update: A[1] is larger than Y[1]")
     end
     # subtest b): sum of old and new A of one timepoint of infection are smaller than corresponding Y
-    if !all(new_A[2:end] + old_A[1:end-1] .<= old_Y[1:end-1])
-        print("Error in A update: sum of two A's is larger than corresponding Y")
+    if !all(new_A[2:end] + old_A[1:end-1] .<= new_Y[2:end])
+        println("Error in A update: sum of two A's is larger than corresponding Y")
+        println("Error (1) at: $(.!(new_A[2:end] + old_A[1:end-1] .<= old_Y[1:end-1]))")
     end
+    println("Update of A looks good")
     
     # test 3: Update of A_sum is likely correct
     if !(new_A_sum[1] == old_A[1] + new_A[2])
         print("Error in A_sum update: A_sum[1] is not correct")
     end
+    println("Update of sum A looks good")
+
 end
 
-test_distribution_update()
-
+# perform 10 tests
+[test_distribution_update() for i in 1:10]
 
 
 ytest = SVector(1.0, 2.0, 3.0)
