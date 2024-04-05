@@ -34,7 +34,7 @@ function CaseCountParameterMapping(θ::SVector{2, T}, m::Int) where {T<:Real}
     shift = θ[2]
     ω = DiscretizedGamma(scale, shift, m+1)
     ϕ = ω./sum(ω)
-    return ω[1:end-1], ϕ
+    return ω[2:end], ϕ
 end 
 
 
@@ -123,12 +123,10 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_Y[1], new_A[1] = rand(rng, MixedPoiBin(Λ, old_R, bin_par[1])) #TODO Parameter ordering
 
     # update A_{t-j, j} by binomial
-    println("n", old_Y[1]-old_A[1], ", p", bin_par[2])
     new_A[2] = rand(rng, Binomial(old_Y[1]-old_A[1], bin_par[2]) ) # n of Binomial is: Y_{t-1}-A_{t-1,0}
     for k in 3:d.m_Λ+1
         # e.g. for k=3 -> A_{t-2,2}
         #         -> n of Binomial is: Y_{t-2}-old_sum_A_{t-2} 
-        println("n", old_Y[k]-old_A_sum[k-2], ", p", bin_par[k])
         new_A[k]= rand(rng, Binomial(new_Y[k]-old_A_sum[k-2], bin_par[k])) #TODO Parameter ordering
     end
 

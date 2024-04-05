@@ -95,7 +95,3 @@ om, pi = CaseCountParameterMapping(SVector(2.0, 2.0), 8)
 om
 
 pi./ (1 .- vcat([0.], cumsum(pi))[1:end-1])
-
-bin_par = [0.8, 1.1]
-bin_par = min.(bin_par, 1.0)
-
