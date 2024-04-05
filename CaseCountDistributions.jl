@@ -9,12 +9,12 @@ function brownian_reproduction_number(Rt::Float64, variance::Float64)
     return max(0, Rt + rand(Normal(0, variance)))
 end
 
-function InfectionPotential(Y::Vector{T}, ω::Vector{T}) where {T<:Real}
+function infection_potential(Y::Vector{T}, ω::Vector{T}) where {T<:Real}
     Λ_it = sum(ω.*Y) 
     return Λ_it
 end
 
-function DiscretizedGamma(shape::T, scale::T, m::Int) where {T<:Real}
+function discretized_gamma(shape::T, scale::T, m::Int) where {T<:Real}
     if shape <= 1
         throw(ArgumentError("shape must be >1"))
     end
@@ -29,10 +29,10 @@ function DiscretizedGamma(shape::T, scale::T, m::Int) where {T<:Real}
     return res
 end
 
-function CaseCountParameterMapping(θ::SVector{2, T}, m::Int) where {T<:Real}
+function case_count_parameter_mapping(θ::SVector{2, T}, m::Int) where {T<:Real}
     scale = θ[1]
     shift = θ[2]
-    ω = DiscretizedGamma(scale, shift, m+1)
+    ω = discretized_gamma(scale, shift, m+1)
     ϕ = ω./sum(ω)
     return ω[2:end], ϕ
 end 
@@ -108,13 +108,13 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_A = similar(old_A)
     new_A_sum = similar(old_A_sum)
 
-    ω, ϕ = CaseCountParameterMapping(d.θ, d.m_Λ)
+    ω, ϕ = case_count_parameter_mapping(d.θ, d.m_Λ)
 
     # get binomial parameters
     bin_par = ϕ./ (1 .- vcat([0.], cumsum(ϕ))[1:end-1])
     bin_par = min.(bin_par, 1.0)
 
-    Λ = InfectionPotential(old_Y[1:end-1], ω) 
+    Λ = infection_potential(old_Y[1:end-1], ω) 
 
     # update Y_{t-i} i=m_Λ,...,1 by shifitng
     new_Y[2:end] = old_Y[1:end-1]

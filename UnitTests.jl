@@ -82,16 +82,9 @@ function test_distribution_update(old_state)
 end
 
 # perform 10 tests
-test_distribution_update(old_state_4)
+[test_distribution_update(old_state_2) for i in 1:10]
+
+[test_distribution_update(old_state_4) for i in 1:10]
 
 
-ytest = SVector(1.0, 2.0, 3.0)
 
-old_test = ytest[SVector(Array(range(1,3))...)]
-
-new_test = similar(old_test)
-
-om, pi = CaseCountParameterMapping(SVector(2.0, 2.0), 8)
-om
-
-pi./ (1 .- vcat([0.], cumsum(pi))[1:end-1])
