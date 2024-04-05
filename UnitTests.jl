@@ -87,4 +87,7 @@ end
 [test_distribution_update(old_state_4) for i in 1:10]
 
 
+using Particles 
+
+Deterministic(old_state_4)
 

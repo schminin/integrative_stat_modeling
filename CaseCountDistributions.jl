@@ -30,9 +30,9 @@ function discretized_gamma(shape::T, scale::T, m::Int) where {T<:Real}
 end
 
 function case_count_parameter_mapping(θ::SVector{2, T}, m::Int) where {T<:Real}
-    scale = θ[1]
-    shift = θ[2]
-    ω = discretized_gamma(scale, shift, m+1)
+    shape = θ[1]
+    scale = θ[2]
+    ω = discretized_gamma(shape, scale, m+1)
     ϕ = ω./sum(ω)
     return ω[2:end], ϕ
 end 
@@ -85,8 +85,8 @@ struct CaseCountDistribution{N, T <: Real, K} <: SMultivariateDistribution{N, T,
     - R_t
 
     θ: Vector of parameters with dimension K=2 with the following order
+    - shpae of the discretized gamma distribution
     - scale of the discretized gamma distribution
-    - shift of the discretized gamma distribution
     """
     function CaseCountDistribution(State::SVector{N, T}, θ::SVector{K, T}) where {N, T <: Real, K}
         ndim = length(State)
