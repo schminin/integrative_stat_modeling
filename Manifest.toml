@@ -2,7 +2,7 @@
 
 julia_version = "1.10.2"
 manifest_format = "2.0"
-project_hash = "65b8663139fcaeece608c8355ae91621ee388e57"
+project_hash = "599adae447cef85dcb856ac9e58100933c6e3eed"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "016833eb52ba2d6bea9fcb50ca295980e728ee24"
@@ -1071,6 +1071,12 @@ deps = ["Dates", "PrecompileTools", "UUIDs"]
 git-tree-sha1 = "8489905bcdbcfac64d1daa51ca07c0d8f0283821"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.1"
+
+[[deps.Particles]]
+deps = ["DiffResults", "Distributions", "LoopVectorization", "Random", "Requires", "Static", "StaticArraysCore", "Statistics"]
+path = "Packages/Particles.jl"
+uuid = "8b319fde-cee8-4296-be82-a4dd2761f2fc"
+version = "0.1.0"
 
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
