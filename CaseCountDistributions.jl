@@ -6,7 +6,7 @@ import StaticDistributions: SMultivariateDistribution
 
 # utility functions
 function brownian_reproduction_number(Rt::Float64, variance::Float64)
-    return max(0, Rt + rand(Normal(0, variance)))
+    return max(0.1, Rt + rand(Normal(0, variance)))
 end
 
 function infection_potential(Y::Vector{T}, ω::Vector{T}) where {T<:Real}
