@@ -7,14 +7,15 @@ using StaticArrays
 include("CaseCountDistributions.jl")
 
 # set dimension of the state space
-const m_Λ = 4
+const m_Λ = 20
 const state_space_dimension = 3*m_Λ + 2
 
 
 struct CaseCountModel <: StateSpaceModel{SVector{state_space_dimension, Float64}, SVector{1, Int64}}
     m_Λ::Int
-    function CaseCountModel(;m_Λ::Int)
-        new(m_Λ)
+    I_init::Int
+    function CaseCountModel(;m_Λ::Int, I_init::Int)
+        new(m_Λ, I_init)
     end
 end
 
@@ -25,15 +26,30 @@ Particles.isparameter(::CaseCountModel, θ) = isa(θ, Vector{Float64}) && length
 
 
 function Particles.ssm_PX0(ssm::CaseCountModel, θ::AbstractVector{<:Real})
+    """
+    pi_ua: binomial parameter for the udnerascertainment distribution in PY
+    """
+    m_Λ = ssm.m_Λ
+    state_space_dimension = 3*m_Λ + 2
     shape, scale = 1+exp(θ[1]), exp(θ[2])
-    initial_state = SVector{state_space_dimension, Float64}(4.0, 8.0, 7.0, 15.0, 3.0, 2.0, 3.0, 6.0, 2.0, 2.0, 7.0, 6.0, 2.0, 1.0)
-    return Deterministic(initial_state)
+    pi_ua = exp(θ[3])
+    Y_init = round(Int,(1+rand(Uniform(0, 1)))*ssm.I_init)
+    X_init = zeros(state_space_dimension)
+    X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
+    X_init[end] = rand(Uniform(0.8, 1.5)) # initial reproduction number
+    X = X_init
+    for i in 1:m_Λ
+        X = rand(CaseCountDistribution(SVector(X...), SVector{3, Float64}(shape, scale, pi_ua)))
+    end
+
+    return Deterministic(X)
 end
 
 function Particles.ssm_PX(ssm::CaseCountModel, θ::AbstractVector{<:Real}, t::Integer, xp::SVector{state_space_dimension, Float64})
     shape, scale = 1+exp(θ[1]), exp(θ[2])
+    pi_ua = exp(θ[3])
 
-    return CaseCountDistribution(xp, SVector{2, Float64}(shape, scale))
+    return CaseCountDistribution(xp, SVector{3, Float64}(shape, scale, pi_ua))
 end
 
 function Particles.ssm_PY(ssm::CaseCountModel, θ::AbstractVector{<:Real}, t::Integer, x::SVector{state_space_dimension, Float64})
@@ -45,11 +61,17 @@ function Particles.ssm_PY(ssm::CaseCountModel, θ::AbstractVector{<:Real}, t::In
 end
 
 
-ssm = CaseCountModel(m_Λ = 4)
+ssm = CaseCountModel(m_Λ = 20, I_init = 100)
 theta = Particles.parameter_template(ssm)
 
 # test
+x0_gen = Particles.ssm_PX0(ssm, theta)
+x0 = rand(x0_gen)
+
+
 T = 20
 xtrue, data_full = rand(ssm, theta, T)
 
 xtrue
+
+m_Λ

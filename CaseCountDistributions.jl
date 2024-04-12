@@ -29,7 +29,7 @@ function discretized_gamma(shape::T, scale::T, m::Int) where {T<:Real}
     return res
 end
 
-function case_count_parameter_mapping(θ::SVector{2, T}, m::Int) where {T<:Real}
+function case_count_parameter_mapping(θ::SVector{3, T}, m::Int) where {T<:Real}
     shape = θ[1]
     scale = θ[2]
     ω = discretized_gamma(shape, scale, m+1)
