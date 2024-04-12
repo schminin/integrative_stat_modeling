@@ -120,14 +120,14 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_Y[2:end] = old_Y[1:end-1]
 
     # update Y_{t}, A_{t,0} by MixedPoiBin
-    new_Y[1], new_A[1] = rand(rng, MixedPoiBin(Λ, old_R, bin_par[1])) #TODO Parameter ordering
+    new_Y[1], new_A[1] = rand(rng, MixedPoiBin(Λ, old_R, bin_par[1])) 
 
     # update A_{t-j, j} by binomial
     new_A[2] = rand(rng, Binomial(old_Y[1]-old_A[1], bin_par[2]) ) # n of Binomial is: Y_{t-1}-A_{t-1,0}
     for k in 3:d.m_Λ+1
         # e.g. for k=3 -> A_{t-2,2}
         #         -> n of Binomial is: Y_{t-2}-old_sum_A_{t-2} 
-        new_A[k]= rand(rng, Binomial(new_Y[k]-old_A_sum[k-2], bin_par[k])) #TODO Parameter ordering
+        new_A[k]= rand(rng, Binomial(new_Y[k]-old_A_sum[k-2], bin_par[k])) 
     end
 
     # update A_sums by shifting and summation
@@ -135,7 +135,7 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_A_sum[2:d.m_Λ-1] = new_A[3:d.m_Λ]+old_A_sum[1:d.m_Λ-2]
 
     # update R by brownian motion
-    new_R = brownian_reproduction_number(old_R, 1.0) #TODO Change variance to be optimized?!
+    new_R = brownian_reproduction_number(old_R, 0.1) #TODO Change variance to be optimized?!
 
     new_state = SVector(vcat(new_Y, new_A, new_A_sum, new_R)...)
 

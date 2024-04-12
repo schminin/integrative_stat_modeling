@@ -89,5 +89,6 @@ end
 
 using Particles 
 
-Deterministic(old_state_4)
+det_dist = Deterministic(old_state_4)
 
+logpdf(det_dist, old_state_4)
