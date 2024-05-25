@@ -11,3 +11,8 @@
 # general
 .idea
 .vscode
+
+# figures
+*.svg
+*.png
+*.jpg

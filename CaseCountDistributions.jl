@@ -6,7 +6,7 @@ import StaticDistributions: SMultivariateDistribution
 
 # utility functions
 function brownian_reproduction_number(Rt::Float64, variance::Float64)
-    return max(0.1, Rt + rand(Normal(0, variance)))
+    return min(2, max(0.1, Rt + rand(Normal(0, variance))))
 end
 
 function infection_potential(Y::Vector{T}, ω::Vector{T}) where {T<:Real}
@@ -135,7 +135,7 @@ function Random.rand(rng::AbstractRNG, d::CaseCountDistribution{N, T, K})::SVect
     new_A_sum[2:d.m_Λ-1] = new_A[3:d.m_Λ]+old_A_sum[1:d.m_Λ-2]
 
     # update R by brownian motion
-    new_R = brownian_reproduction_number(old_R, 0.1) #TODO Change variance to be optimized?!
+    new_R = brownian_reproduction_number(old_R, 0.01) #TODO Change variance to be optimized?!
 
     new_state = SVector(vcat(new_Y, new_A, new_A_sum, new_R)...)
 

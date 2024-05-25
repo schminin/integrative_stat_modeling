@@ -33,16 +33,16 @@ Particles.isparameter(::CaseCountModel, θ) = isa(θ, Vector{Float64}) && length
 
 function Particles.ssm_PX0(ssm::CaseCountModel, θ::AbstractVector{<:Real})
     """
-    pi_ua: binomial parameter for the udnerascertainment distribution in PY
+    pi_ua: binomial parameter for the underascertainment distribution in PY
     """
     m_Λ = ssm.m_Λ
     state_space_dimension = 3*m_Λ + 2
     shape, scale = 1+exp(θ[1]), exp(θ[2])
     pi_ua = exp(θ[3])
-    Y_init = round(Int,(1+rand(Uniform(0, 1)))*ssm.I_init)
+    Y_init = ssm.I_init # initiallay infected people
     X_init = zeros(state_space_dimension)
     X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
-    X_init[end] = rand(Uniform(0.8, 1.5)) # initial reproduction number
+    X_init[end] = 1 # initial reproduction number
     X = X_init
     for i in 1:m_Λ
         X = rand(CaseCountDistribution(SVector(X...), SVector{3, Float64}(shape, scale, pi_ua)))
@@ -67,23 +67,6 @@ function Particles.ssm_PY(ssm::CaseCountModel, θ::AbstractVector{<:Real}, t::In
 end
 
 
-ssm = CaseCountModel(m_Λ = 20, I_init = 100)
-theta0 = Particles.parameter_template(ssm)
-
-# test
-x0_gen = Particles.ssm_PX0(ssm, theta0)
-x0 = rand(x0_gen)
-
-x_fail = zeros(state_space_dimension)
-x_fail[end] = 0.2
-rand(Particles.ssm_PX(ssm, theta0, 1, SVector(x_fail...)))
-rand(Particles.ssm_PY(ssm, theta0, 1, SVector(x_fail...)))
-
-T = 20
-xtrue, data_full = rand(ssm, theta0, T)
-
-xtrue
-
 struct LogPosterior{T_SMC <: SMC, T_CACHE}
     pf::T_SMC
     cache::T_CACHE
@@ -99,6 +82,7 @@ struct LogPosterior{T_SMC <: SMC, T_CACHE}
         return new{typeof(pf), typeof(cache)}(pf, cache)
     end
 end
+
 function (logp::LogPosterior)(theta) #::Float64
     reset!(logp.pf, theta)
     offlinefilter!(logp.pf, logp.cache)
@@ -122,40 +106,7 @@ function logp_vs_nparticles(ssm::StateSpaceModel, data, nparticles::AbstractVect
         end
     end
     plt_df = DataFrame(nparticles=x, logp=y)
-    @df plt_df violin(:nparticles, :logp)
+    display(@df plt_df violin(:nparticles, :logp))
     return plt_df
 end
 
-
-plt_df = logp_vs_nparticles(ssm, data_full, [100, 150, 200, 250, 300, 500, 1000], theta0; nruns=200)
-
-findall(isnan.(y_plt))
-
-
-violin(;x_plt, y_plt)
-
-logp = LogPosterior(ssm, data_full, 100);
-@time post_val = logp(theta0)
-
-failed_hist = post_val
-
-fieldnames(typeof(failed_hist))
-failed_hist.history_pf.weights
-findall(isnan.(failed_hist))
-fieldnames(typeof(failed_hist.history_pf))
-
-[sum(failed_hist.history_pf.particles[end][i] .> 0.0) for i in 1:100]
-
-
-
-
-last_state = failed_hist.history_pf.particles[end][end]
-
-logpdf(Particles.ssm_PY(ssm, theta0, 1, last_state), data_full[2])
-
-
-
-model = DensityModel(logp)
-
-spl = RWMH([Normal(0.0, 0.05), Normal(0.0, 0.05), Normal(0.0, 0.05)])
-chain = sample(model, spl, 100; init_params=theta0, param_names=["shape", "scale", "pi_ua"], chain_type=Chains)
