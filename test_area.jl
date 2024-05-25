@@ -14,7 +14,7 @@ include("CaseCountDistributions.jl")
 include("CaseCountModel.jl")
 
 # set dimension of the state space
-const m_Λ = 20
+const m_Λ = 13
 const state_space_dimension = 3*m_Λ + 2
 
 
@@ -30,27 +30,44 @@ function initial_state_generation(ssm::CaseCountModel, θ::AbstractVector{<:Real
     pi_ua = exp(θ[3])
     Y_init = ssm.I_init # initiallay infected people
     X_init = zeros(state_space_dimension)
-    X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
+    X_init[1:m_Λ+1] = repeat([Int(round(Y_init/(m_Λ+1)))], m_Λ+1)
+    X_init[1] += Y_init-sum(X_init[1:m_Λ+1])
     X_init[end] = 1 # initial reproduction number
     X = X_init
     R_history = [1.0]
+
+    ω, ϕ = case_count_parameter_mapping(SVector(exp.(θ)...), m_Λ)
+    Λ = infection_potential(X_init[1:m_Λ+1][1:end-1], ω) # old_Y[1:end-1]
+    Λ_history = [Λ]
+
     for i in 1:m_Λ
         X = rand(CaseCountDistribution(SVector(X...), SVector{3, Float64}(shape, scale, pi_ua)))
+        Λ = infection_potential(X[1:m_Λ+1][1:end-1], ω) # old_Y[1:end-1]
+
         push!(R_history, X[end])
+        push!(Λ_history, Λ)
     end
 
-    return X, R_history
+    return X, R_history, Λ_history
 end
 
-ssm = CaseCountModel(m_Λ = 20, I_init = 100)
+ssm = CaseCountModel(m_Λ = m_Λ, I_init = 100)
 theta0 = Particles.parameter_template(ssm)
 
 initial_states_list = [initial_state_generation(ssm, theta0) for i in 1:10000]
 x0_list = [x[1] for x in initial_states_list]
+Λ_hist_list = [x[3] for x in initial_states_list]
+R_hist_list = [x[2] for x in initial_states_list]
 Rmean_list = [mean(x[2]) for x in initial_states_list]
 R0_list = [x[end] for x in x0_list]
 sum_curr_inf_list = [sum(x[1:m_Λ+1]) for x in x0_list]
 Rstd_list = [std(x[2]) for x in initial_states_list]
+
+poi_par_list = [Λ_hist_list[i].*R_hist_list[i] for i in eachindex(Λ_hist_list)]
+
+plot(poi_par_list, legend=false, title = "Poisson Parameters")
+plot(R_hist_list, legend=false, title = "R0 History")
+plot(Λ_hist_list, legend=false, title = "Infection Potential")
 
 plot(Rstd_list, sum_curr_inf_list, seriestype = :scatter, xlabel = "R0_mean", ylabel = "Current Infections", title = "Initial State Vectors")
 plot(Rmean_list, sum_curr_inf_list, seriestype = :scatter, xlabel = "R0_std", ylabel = "Current Infections", title = "Initial State Vectors")
@@ -62,17 +79,17 @@ sum_curr_inf_test_list = sum_curr_inf_list[test_idxs]
 Rmean_test_list = Rmean_list[test_idxs]
 Rstd_test_list = Rstd_list[test_idxs]
 
-plot(Rstd_test_list, sum_curr_inf_test_list, seriestype = :scatter, xlabel = "R0_mean", ylabel = "Current Infections", title = "Initial State Vectors")
-plot(Rmean_test_list, sum_curr_inf_test_list, seriestype = :scatter, xlabel = "R0_std", ylabel = "Current Infections", title = "Initial State Vectors")
+plot(Rstd_test_list, sum_curr_inf_test_list, seriestype = :scatter, xlabel = "R0_std", ylabel = "Current Infections", title = "Initial State Vectors")
+plot(Rmean_test_list, sum_curr_inf_test_list, seriestype = :scatter, xlabel = "R0_mean", ylabel = "Current Infections", title = "Initial State Vectors")
 
 
 
 
 # plot particles vs. log-posterior variance
-T = 20
+T = 50
 xtrue, data_full = rand(ssm, theta0, T)
 
-plt_df = logp_vs_nparticles(ssm, data_full, [100, 200, 500], theta0; nruns=200)
+plt_df = logp_vs_nparticles(ssm, data_full, [500], theta0; nruns=200)
 
 
 logp = LogPosterior(ssm, data_full, 500);

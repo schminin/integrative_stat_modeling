@@ -13,7 +13,7 @@ using DataFrames
 include("CaseCountDistributions.jl")
 
 # set dimension of the state space
-const m_Λ = 20
+const m_Λ = 13
 const state_space_dimension = 3*m_Λ + 2
 
 
@@ -41,7 +41,9 @@ function Particles.ssm_PX0(ssm::CaseCountModel, θ::AbstractVector{<:Real})
     pi_ua = exp(θ[3])
     Y_init = ssm.I_init # initiallay infected people
     X_init = zeros(state_space_dimension)
-    X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
+    # X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
+    X_init[1:m_Λ+1] = repeat([Int(round(Y_init/(m_Λ+1)))], m_Λ+1)
+    X_init[1] += Y_init-sum(X_init[1:m_Λ+1])
     X_init[end] = 1 # initial reproduction number
     X = X_init
     for i in 1:m_Λ

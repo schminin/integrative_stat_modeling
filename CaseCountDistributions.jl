@@ -37,7 +37,6 @@ function case_count_parameter_mapping(θ::SVector{3, T}, m::Int) where {T<:Real}
     return ω[2:end], ϕ
 end 
 
-
 # distributions
 
 struct MixedPoiBin{T<:Real} <: SMultivariateDistribution{2, T, Discrete}
@@ -49,11 +48,6 @@ struct MixedPoiBin{T<:Real} <: SMultivariateDistribution{2, T, Discrete}
     end
 end
 
-
-
-mm = MixedPoiBin(2.0, 3.0, 0.5)
-
-
 function Random.rand(rng::AbstractRNG, d::MixedPoiBin{T})::SVector{2, T} where {T<: Real}
     Y = rand(rng, Poisson(d.Lambda*d.R))
     A = rand(rng, Binomial(Y, d.Phi))
@@ -61,10 +55,7 @@ function Random.rand(rng::AbstractRNG, d::MixedPoiBin{T})::SVector{2, T} where {
     return SVector(Y, A)
 end
 
-
 Random.rand(d::MixedPoiBin) = rand(Random.default_rng(), d)
-
-Y, A = rand(mm)
 
 function Distributions.logpdf(::MixedPoiBin{T}, x) where {T <: Real}
     # TODO implement correctly, this assumes independence which is not true
