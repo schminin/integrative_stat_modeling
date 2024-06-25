@@ -51,9 +51,7 @@ function initial_state_generation(ssm::CaseCountModel, θ::AbstractVector{<:Real
 
     for i in 1:m_Λ
         X = rand(CaseCountDistribution(SVector(X...), SVector{3, Float64}(shape, scale, pi_ua)))
-        Λ = infection_potential(X[1:m_Λ+1][1:end-1], ω) # old_Y[1:end-1]
     end
-
     return X
 end
 
