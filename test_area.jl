@@ -28,7 +28,7 @@ function initial_state_generation(ssm::CaseCountModel, θ::AbstractVector{<:Real
     m_Λ = ssm.m_Λ
     state_space_dimension = 3*m_Λ + 2
     shape, scale = 1+exp(θ[1]), exp(θ[2])
-    pi_ua = exp(θ[3])
+    pi_ua = StatsFuns.Logistic(θ[3])
     Y_init = ssm.I_init # initiallay infected people
     X_init = zeros(state_space_dimension)
     X_init[1:m_Λ+1] = repeat([Int(round(Y_init/(m_Λ+1)))], m_Λ+1)
@@ -37,7 +37,7 @@ function initial_state_generation(ssm::CaseCountModel, θ::AbstractVector{<:Real
     X = X_init
     R_history = [1.0]
 
-    ω, ϕ = case_count_parameter_mapping(SVector(exp.(θ)...), m_Λ)
+    ω, ϕ = case_count_parameter_mapping(SVector{3, Float64}(shape, scale, pi_ua), m_Λ)
     Λ = infection_potential(X_init[1:m_Λ+1][1:end-1], ω) # old_Y[1:end-1]
     Λ_history = [Λ]
 

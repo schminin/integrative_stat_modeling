@@ -29,7 +29,6 @@ end
     # using ModelingToolkit
 
     using Particles
-    using ParticlesDE
     using StaticDistributions
 
 
@@ -63,8 +62,8 @@ end
     include("utilities.jl")
 
     ssm = CaseCountModel(m_Λ = m_Λ, I_init = 100)
-
-    data = load("home/vincent/wastewater_inference/integrative_stat_modelling/data/synthetic_casecount_data.jld2", "synth_data")
+    
+    data = load("/home/vincent/wastewater_inference/integrative_stat_modelling/data/synth_casecount_data.jld2", "synth_data")
     θ_0 = Particles.parameter_template(ssm) 
     logp = LogPosterior(ssm, data, nparticles)
 
