@@ -14,8 +14,6 @@ end
     using Random
     using StaticArrays
     using Distributions
-    using DifferentialEquations
-    using StochasticDiffEq
     using Plots
     # using PEtab # not running on the cluster and I think not needed.
     using CSV
