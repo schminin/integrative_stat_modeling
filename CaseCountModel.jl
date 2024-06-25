@@ -38,7 +38,7 @@ function Particles.ssm_PX0(ssm::CaseCountModel, θ::AbstractVector{<:Real})
     m_Λ = ssm.m_Λ
     state_space_dimension = 3*m_Λ + 2
     shape, scale = 1+exp(θ[1]), exp(θ[2])
-    pi_ua = exp(θ[3])
+    pi_ua = StatsFuns.logistic(θ[3])
     Y_init = ssm.I_init # initiallay infected people
     X_init = zeros(state_space_dimension)
     # X_init[1:m_Λ+1] = rand(Multinomial(Y_init, fill(1/(m_Λ+1), m_Λ+1)))
