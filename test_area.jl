@@ -9,6 +9,7 @@ using Plots
 using AdvancedMH
 using MCMCChains
 using DataFrames
+using JLD2
 
 include("CaseCountDistributions.jl")
 include("CaseCountModel.jl")
@@ -89,6 +90,9 @@ plot(Rmean_test_list, sum_curr_inf_test_list, seriestype = :scatter, xlabel = "R
 T = 50
 xtrue, data_full = rand(ssm, theta0, T)
 
+# save data
+save("synth_casecount_data.jld2", "synth_data", data_full)
+
 plt_df = logp_vs_nparticles(ssm, data_full, [500], theta0; nruns=200)
 
 
@@ -127,3 +131,60 @@ model = DensityModel(logp)
 
 spl = RWMH([Normal(0.0, 0.05), Normal(0.0, 0.05), Normal(0.0, 0.05)])
 chain = sample(model, spl, 100; init_params=theta0, param_names=["shape", "scale", "pi_ua"], chain_type=Chains)
+
+exp(0.16)
+
+theta0
+# test sampling with pypestousing PyCall
+using PyCall
+pypesto = pyimport("pypesto")
+
+# include utilities for pypesto to MCMCChains
+include("utilities.jl")
+
+ssm = CaseCountModel(m_Λ = m_Λ, I_init = 100)
+
+# data = load("home/vincent/WasteWater_inference/data/synthetic_casecount_data.jld2", "synth_data")
+θ0 = Particles.parameter_template(ssm) 
+logp = LogPosterior(ssm, data_full, 500)
+
+# for pypesto we need the negative log-likelihood
+neg_llh = let logp =logp
+    p -> begin
+        logval = logp(p)
+        if isnan(logval)
+            return -Inf
+        end
+        return -logval
+    end
+end
+
+# transform to pypesto objective
+objective = pypesto.Objective(fun=neg_llh)
+
+problem = pypesto.Problem(
+    objective,
+    x_names=["shape", "scale", "pi_ua"],
+    lb=[-1, -1, -1], # parameter bounds
+    ub=[1, 1, 1], # NB for sampling it is usually better if you remap parameters to (-∞, ∞)
+    copy_objective=false, # important
+)
+
+# specify sampler
+sampler = pypesto.sample.AdaptiveMetropolisSampler()
+
+# sample start value
+x0 = θ0
+
+# sample
+function pypesto_chain()
+    result = pypesto.sample.sample(
+                problem,
+                n_samples=100,
+                x0=x0, # starting point
+                sampler=sampler,
+                )
+    return  Chains_from_pypesto(result)
+end
+
+jlchain = pypesto_chain()

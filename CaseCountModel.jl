@@ -90,7 +90,8 @@ function (logp::LogPosterior)(theta) #::Float64
     offlinefilter!(logp.pf, logp.cache)
     if isnan(logp.pf.history_pf.logCnorm[end])
         println("NaN posterior")
-        return logp.pf
+        # return logp.pf
+        return -Inf
     end
     return logp.pf.history_pf.logCnorm[end]
 end

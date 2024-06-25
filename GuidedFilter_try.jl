@@ -233,7 +233,7 @@ llh_guided = let llh_ssm_guided = llh_ssm_guided, ssm_guided = ssm_guided
             return -Inf
         else
             return llh_ssm_guided(p)
-        end
+        endå
     end
 end
 model_guided = DensityModel(llh_guided)

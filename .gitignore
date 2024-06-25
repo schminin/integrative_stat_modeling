@@ -16,3 +16,6 @@
 *.svg
 *.png
 *.jpg
+
+# output folder
+output/
